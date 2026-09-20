@@ -5,6 +5,7 @@ from rich.console import Console
 from rich.table import Table
 
 from .workspace import Workspace, find_workspace_root, init_workspace, AGENTS_DIR
+from agents_cli.loader import load_registry
 
 app = typer.Typer(help="Orchestrateur multi-agents local.", no_args_is_help=True)
 console = Console()
@@ -88,6 +89,46 @@ def show(name: str):
     else:
         console.print(f"[red]'{name}' n'est ni un agent ni un skill.[/red]")
         raise typer.Exit(1)
+
+PATH_ARG = typer.Argument(Path("."), help="Racine du projet")
+
+
+@app.command("roles")
+def cmd_roles(path: Path = PATH_ARG) -> None:
+    """Liste les rôles disponibles pour ce projet."""
+    reg = load_registry(path)
+    table = Table("Rôle", "Alias", "Modèle", "Provider", "Skills")
+    for role in reg.roles.values():
+        model, provider = reg.resolve_model(role)
+        table.add_row(
+            role.name,
+            role.model_alias,
+            model,
+            provider,
+            ", ".join(role.skills) or "-",
+        )
+    console.print(table)
+
+
+@app.command("skills")
+def cmd_skills(path: Path = PATH_ARG) -> None:
+    """Liste les skills disponibles pour ce projet."""
+    reg = load_registry(path)
+    table = Table("Skill", "Description")
+    for skill in reg.skills.values():
+        table.add_row(skill.name, skill.description)
+    console.print(table)
+
+
+@app.command("prompt")
+def cmd_prompt(role: str, path: Path = PATH_ARG) -> None:
+    """Affiche le prompt final d'un rôle (base + contexte projet + skills)."""
+    reg = load_registry(path)
+    if role not in reg.roles:
+        console.print(f"[red]Rôle inconnu :[/] {role}")
+        console.print("Rôles disponibles : " + ", ".join(reg.roles))
+        raise typer.Exit(1)
+    console.print(reg.roles[role].build_prompt(reg.skills, reg.context))
 
 
 if __name__ == "__main__":

@@ -48,7 +48,16 @@ agents:
   sentinelle: { provider: ollama, model: qwen3:8b }          # → mammouth/claude-sonnet plus tard
   mentor:     { provider: ollama, model: gemma3:4b, temperature: 0.5 }
   architecte: { provider: ollama, model: qwen3:8b }          # → mammouth/claude-sonnet plus tard
-  designer:   { provider: ollama, model: qwen3:8b }          # → mammouth/claude-sonnet plus tard
+  designer:   { provider: ollama, model: qwen3:8b }   # → mammouth/claude-sonnet plus tard
+
+aliases:
+  maestro:     { model: qwen2.5:14b,      provider: ollama }
+  architecte:  { model: claude-sonnet-4,  provider: mammouth }
+  designer:    { model: claude-sonnet-4,  provider: mammouth }
+  codeur:       { model: qwen2.5-coder:7b, provider: ollama }
+  reviewer:    { model: qwen2.5:9b,       provider: ollama }
+  sentinelle:  { model: qwen2.5:14b,      provider: ollama }
+  mentor:      { model: qwen2.5:14b,      provider: ollama }
 """
 
 _OUTPUT_JSON = """
