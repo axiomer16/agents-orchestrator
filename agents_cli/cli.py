@@ -7,6 +7,10 @@ from rich.table import Table
 from .workspace import Workspace, find_workspace_root, init_workspace, AGENTS_DIR
 from agents_cli.loader import load_registry
 
+from rich.table import Table
+from .runner import add_task, load_queue, run_queue
+
+
 app = typer.Typer(help="Orchestrateur multi-agents local.", no_args_is_help=True)
 console = Console()
 
@@ -130,6 +134,28 @@ def cmd_prompt(role: str, path: Path = PATH_ARG) -> None:
         raise typer.Exit(1)
     console.print(reg.roles[role].build_prompt(reg.skills, reg.context))
 
+@app.command("task")
+def cmd_task(goal: str, agent: str = "codeur",
+             files: list[str] = typer.Option([], "--file", "-f"),
+             path: Path = PATH_ARG) -> None:
+    """Ajoute une tâche à la queue."""
+    t = add_task(path, goal, agent, files)
+    console.print(f"[green]✓[/] {t['id']} → {agent} : {goal}")
+
+
+@app.command("tasks")
+def cmd_tasks(path: Path = PATH_ARG) -> None:
+    """Liste les tâches et leur statut."""
+    table = Table("ID", "Agent", "Statut", "Essais", "Objectif")
+    for t in load_queue(path):
+        table.add_row(t["id"], t["agent"], t["status"], str(t.get("attempts", 0)), t["goal"][:60])
+    console.print(table)
+
+
+@app.command("run")
+def cmd_run(task_id: str = typer.Argument(None), path: Path = PATH_ARG) -> None:
+    """Exécute les tâches prêtes (ou une seule si ID donné), avec retries."""
+    run_queue(path, console, only=task_id)
 
 if __name__ == "__main__":
     app()

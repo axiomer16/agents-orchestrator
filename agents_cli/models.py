@@ -36,6 +36,12 @@ class Role:
     system_prompt: str
     model_alias: str = "default"
     skills: list[str] = field(default_factory=list)
+    model: str | None = None
+    provider: str | None = None
+    fallback: str | None = None
+    num_ctx: int | None = None
+    temperature: float | None = None
+    timeout: int | None = None
 
     def build_prompt(
         self,
