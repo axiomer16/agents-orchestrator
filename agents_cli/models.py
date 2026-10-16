@@ -48,16 +48,19 @@ class Role:
         skills: dict[str, Skill],
         project_context: str = "",
     ) -> str:
+        """Compose le prompt final : base + contexte projet + skills injectés.
+
+        Les skills déclarés et trouvés sont ajoutés tels quels ; les skills
+        déclarés mais introuvables sont consignés en commentaire dans le
+        prompt (et l'appelant doit aussi les journaliser).
+        """
         parts = [self.system_prompt.strip()]
         if project_context:
             parts.append("# Contexte du projet\n" + project_context.strip())
         for name in self.skills:
             skill = skills.get(name)
             if skill is None:
-                for name in self.skills:
-                    skill = skills.get(name)
-                    if skill is None:
-                        parts.append(f"# Skill manquant : {name} (ignoré)")
-                        continue
-                    parts.append(f"# Skill : {skill.name}\n{skill.content}")
+                parts.append(f"# Skill manquant : {name} (ignoré)")
+                continue
+            parts.append(f"# Skill : {skill.name}\n{skill.content}")
         return "\n\n".join(parts)

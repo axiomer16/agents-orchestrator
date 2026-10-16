@@ -7,8 +7,8 @@ from rich.table import Table
 from .workspace import Workspace, find_workspace_root, init_workspace, AGENTS_DIR
 from agents_cli.loader import load_registry
 
-from rich.table import Table
 from .runner import add_task, load_queue, run_queue
+from .logger import get_logger, log_event
 
 
 app = typer.Typer(help="Orchestrateur multi-agents local.", no_args_is_help=True)
@@ -94,6 +94,7 @@ def show(name: str):
         console.print(f"[red]'{name}' n'est ni un agent ni un skill.[/red]")
         raise typer.Exit(1)
 
+
 PATH_ARG = typer.Argument(Path("."), help="Racine du projet")
 
 
@@ -134,28 +135,70 @@ def cmd_prompt(role: str, path: Path = PATH_ARG) -> None:
         raise typer.Exit(1)
     console.print(reg.roles[role].build_prompt(reg.skills, reg.context))
 
+
 @app.command("task")
-def cmd_task(goal: str, agent: str = "codeur",
-             files: list[str] = typer.Option([], "--file", "-f"),
-             path: Path = PATH_ARG) -> None:
+def cmd_task(
+    goal: str,
+    agent: str = typer.Option("codeur", "--agent", "-a", help="Nom du rôle"),
+    files: list[str] = typer.Option([], "--file", "-f", help="Fichiers concernés"),
+    depends_on: list[str] = typer.Option(
+        [], "--depends-on", "-d",
+        help="IDs de tâches à terminer avant celle-ci (chaînage)",
+    ),
+    path: Path = PATH_ARG,
+) -> None:
     """Ajoute une tâche à la queue."""
-    t = add_task(path, goal, agent, files)
-    console.print(f"[green]✓[/] {t['id']} → {agent} : {goal}")
+    t = add_task(path, goal, agent, files, depends_on=depends_on)
+    deps = ", ".join(t["depends_on"]) or "—"
+    console.print(
+        f"[green]✓[/] {t['id']} → {agent} : {goal}\n"
+        f"   dépend de : {deps}"
+    )
 
 
 @app.command("tasks")
 def cmd_tasks(path: Path = PATH_ARG) -> None:
-    """Liste les tâches et leur statut."""
-    table = Table("ID", "Agent", "Statut", "Essais", "Objectif")
-    for t in load_queue(path):
-        table.add_row(t["id"], t["agent"], t["status"], str(t.get("attempts", 0)), t["goal"][:60])
+    """Liste les tâches et leur statut (avec chaînage)."""
+    queue = load_queue(path)
+    if not queue:
+        console.print("[yellow]Queue vide.[/yellow]")
+        return
+    table = Table("ID", "Agent", "Statut", "Essais",
+                  "Dépend de", "Objectif")
+    for t in queue:
+        deps = ", ".join(t.get("depends_on") or []) or "—"
+        table.add_row(
+            t["id"], t["agent"], t["status"],
+            str(t.get("attempts", 0)),
+            deps, t["goal"][:50],
+        )
     console.print(table)
+    # résumé du chaînage
+    pending = [t for t in queue if t["status"] == "pending"]
+    blocked = [t for t in queue
+               if t["status"] == "pending" and t.get("depends_on")]
+    if blocked:
+        console.print(
+            f"[cyan]{len(blocked)} tâche(s) en attente de dépendances :[/cyan]"
+        )
+        for t in blocked:
+            console.print(
+                f"  • {t['id']} attend : "
+                f"{', '.join(t['depends_on'])}"
+            )
+
+
+@app.command("queue")
+def cmd_queue(path: Path = PATH_ARG) -> None:
+    """Alias de ``agents tasks`` : affiche la file et les chaînes."""
+    cmd_tasks(path)
 
 
 @app.command("run")
 def cmd_run(task_id: str = typer.Argument(None), path: Path = PATH_ARG) -> None:
     """Exécute les tâches prêtes (ou une seule si ID donné), avec retries."""
     run_queue(path, console, only=task_id)
+
 
 if __name__ == "__main__":
     app()
